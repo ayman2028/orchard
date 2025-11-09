@@ -2,7 +2,7 @@ from django.shortcuts import render
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from datetime import datetime
+from datetime import datetime, timedelta, time
 from .models import Agent, AgentSettings, Appointment, CalendarEvent
 
 class AvailableTimeslotsAPIView(APIView):
@@ -39,82 +39,233 @@ class AvailableTimeslotsAPIView(APIView):
                 'error': 'start_date must be before or equal to end_date'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Test database queries
+        # Get optional agent_id parameter
+        agent_id = request.query_params.get('agent_id')
+        
+        # Generate available timeslots
         try:
-            database_info = self.get_database_info(start_date, end_date)
+            available_slots = self.get_available_timeslots(start_date, end_date, agent_id)
             return Response({
-                'message': 'Database connection working!',
                 'start_date': start_date_str,
                 'end_date': end_date_str,
-                'database_info': database_info,
-                'status': 'Ready for scheduling algorithm implementation',
+                'agent_id': agent_id,
+                'available_timeslots': available_slots,
+                'total_slots': len(available_slots),
                 'generated_at': datetime.now().isoformat()
             })
         except Exception as e:
             return Response({
-                'error': f'Database connection failed: {str(e)}'
+                'error': f'Failed to generate timeslots: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    def get_database_info(self, start_date, end_date):
+    def get_available_timeslots(self, start_date, end_date, agent_id=None):
         """
-        Test database connectivity and return summary information
-        """
-        # Get active agents
-        active_agents = Agent.objects.filter(active=True)
-        # Get agent settings
-        agent_settings = AgentSettings.objects.all()
-        # Get appointments in date range
-        appointments = Appointment.objects.filter(
-            appointment_time__date__range=[start_date, end_date]
-        )
-        # Get calendar events in date range
-        calendar_events = CalendarEvent.objects.filter(
-            start_time__date__range=[start_date, end_date]
-        )
+        Main method to get available timeslots using optimized algorithm
+        Returns all available slots across agents, or for a specific agent if agent_id is provided
+        1. Get active agents   
+        2. Bulk query appointments for each agent
+        3. Filter dates by weekly cap
+        4. Filter dates by daily cap
+        5. Generate time slots for valid dates only
+        6. Bulk query conflicts (appointments and calendar events)
+        7. Filter slots by conflicts
+        8. Return available slots
         
-        return {
-            'agents': {
-                'active_count': active_agents.count(),
-                'active_agents': [
-                    {
-                        'id': agent.id,
-                        'name': agent.full_name,
-                        'email': agent.email
-                    } for agent in active_agents
-                ]
-            },
-            'agent_settings': {
-                'total_count': agent_settings.count(),
-                'settings': [
-                    {
-                        'agent_id': setting.agent_id,
-                        'daily_caps': setting.daily_caps,
-                        'weekly_caps': setting.weekly_caps
-                    } for setting in agent_settings
-                ]
-            },
-            'appointments': {
-                'count_in_range': appointments.count(),
-                'sample_appointments': [
-                    {
-                        'id': appt.id,
-                        'agent_id': appt.agent_id,
-                        'client_name': appt.client_name,
-                        'appointment_time': appt.appointment_time.isoformat(),
-                        'status': appt.status
-                    } for appt in appointments[:5]  # Show first 5
-                ]
-            },
-            'calendar_events': {
-                'count_in_range': calendar_events.count(),
-                'sample_events': [
-                    {
-                        'id': event.id,
-                        'agent_id': event.agent_id,
-                        'event_name': event.event_name,
-                        'start_time': event.start_time.isoformat(),
-                        'end_time': event.end_time.isoformat()
-                    } for event in calendar_events[:5]  # Show first 5
-                ]
-            }
-        }
+        """
+        # Step 1: Get active agents
+        active_agents = Agent.objects.filter(active=True)
+        if agent_id:
+            active_agents = active_agents.filter(id=agent_id) #Time complexity: O(1) for filtering by ID
+        
+        all_available_slots = []
+        
+        # Step 2-7: Process each agent
+        for agent in active_agents:
+            agent_slots = self.get_available_timeslots_for_agent(agent, start_date, end_date)
+            all_available_slots.extend(agent_slots) #Just adds all available slots
+        
+        return all_available_slots
+    
+    def get_available_timeslots_for_agent(self, agent, start_date, end_date):
+        """
+        Get available timeslots for a specific agent using optimized algorithm
+        """
+        # Get agent's capacity settings
+        try:
+            agent_settings = AgentSettings.objects.get(agent_id=agent.id)
+        except AgentSettings.DoesNotExist:
+            # Default fallback if no settings found
+            agent_settings = type('obj', (object,), {'daily_caps': 1, 'weekly_caps': 3})()
+        
+        # Step 2: Bulk query appointments for this agent
+        agent_appointments = Appointment.objects.filter(
+            agent_id=agent.id,
+            appointment_time__date__range=[start_date, end_date],
+            status__in=['scheduled', 'confirmed']  # Only active appointments
+        ).values_list('appointment_time__date', flat=True)
+        
+        # Step 3 & 4: Filter dates by weekly and daily caps
+        valid_dates = self.get_valid_dates_after_caps(agent.id, start_date, end_date, agent_appointments, agent_settings)
+        
+        # Step 5: Generate time slots for valid dates only
+        generated_slots = []
+        for date in valid_dates:
+            daily_slots = self.generate_daily_time_slots(agent, date)
+            generated_slots.extend(daily_slots)
+        
+        # Step 6 & 7: Filter by conflicts
+        available_slots = self.filter_slots_by_conflicts(generated_slots, start_date, end_date)
+        
+        return available_slots
+    
+    def get_valid_dates_after_caps(self, agent_id, start_date, end_date, appointment_dates, agent_settings):
+        """
+        Filter dates that pass both weekly and daily cap constraints using agent's specific settings
+        """
+        # Count appointments per date and per week
+        #basically hashsets (maps) for each date and week.
+        daily_counts = {}
+        weekly_counts = {}
+        
+        for appt_date in appointment_dates:
+            # Daily count
+            daily_counts[appt_date] = daily_counts.get(appt_date, 0) + 1
+            
+            # Weekly count (Monday = week start)
+            week_start = self.get_monday_of_week(appt_date)
+            weekly_counts[week_start] = weekly_counts.get(week_start, 0) + 1
+        
+        # Find valid dates
+        valid_dates = []
+        current_date = start_date
+        
+        while current_date <= end_date:
+            week_start = self.get_monday_of_week(current_date)
+            
+            # Step 3: Check weekly cap first (most restrictive) - use agent's weekly_caps
+            if weekly_counts.get(week_start, 0) >= agent_settings.weekly_caps:
+                # Skip entire week - jump to next Monday
+                days_to_next_monday = 7 - current_date.weekday()
+                current_date = current_date + timedelta(days=days_to_next_monday)
+                continue
+            
+            # Step 4: Check daily cap - use agent's daily_caps
+            if daily_counts.get(current_date, 0) >= agent_settings.daily_caps:
+                current_date += timedelta(days=1)
+                continue
+            
+            # Date is valid!
+            valid_dates.append(current_date)
+            current_date += timedelta(days=1)
+        
+        return valid_dates
+    
+    def generate_daily_time_slots(self, agent, date):
+        """
+        Generate 15 time slots for a specific agent on a specific date
+        Working hours: 9:00 AM - 5:00 PM, 30-minute increments
+        """
+        slots = []
+        start_time = time(9, 0)   # 9:00 AM
+        end_time = time(17, 0)    # 5:00 PM
+        
+        current_slot_time = datetime.combine(date, start_time)
+        end_datetime = datetime.combine(date, end_time)
+        
+        while current_slot_time < end_datetime:
+            # Each appointment is 60 minutes
+            appointment_end = current_slot_time + timedelta(minutes=60)
+            
+            # Check if 60-minute appointment fits within working hours
+            if appointment_end <= end_datetime:
+                slots.append({
+                    'agent_id': agent.id,
+                    'agent_name': agent.full_name,
+                    'agent_email': agent.email,
+                    'date': date.isoformat(),
+                    'time': current_slot_time.strftime('%H:%M'),
+                    'datetime': current_slot_time.isoformat(),
+                    'end_datetime': appointment_end.isoformat(),
+                    'duration_minutes': 60
+                })
+            
+            # Move to next 30-minute slot
+            current_slot_time += timedelta(minutes=30)
+        
+        return slots
+    
+    def filter_slots_by_conflicts(self, generated_slots, start_date, end_date):
+        """
+        Filter out slots that conflict with existing appointments or calendar events
+        """
+        if not generated_slots:
+            return []
+        
+        # Step 6: Bulk query conflicts
+        # Get all appointments in date range for buffer checking
+        all_appointments = Appointment.objects.filter(
+            appointment_time__date__range=[start_date, end_date],
+            status__in=['scheduled', 'confirmed']
+        ).values('agent_id', 'appointment_time')
+        
+        # Get all calendar events in date range
+        all_calendar_events = CalendarEvent.objects.filter(
+            start_time__date__range=[start_date, end_date]
+        ).values('agent_id', 'start_time', 'end_time')
+        
+        # Step 7: Filter each slot
+        available_slots = []
+        for slot in generated_slots:
+            if self.is_slot_available(slot, all_appointments, all_calendar_events):
+                available_slots.append(slot)
+        
+        return available_slots
+    
+    def is_slot_available(self, slot, all_appointments, all_calendar_events):
+        """
+        Check if a specific slot is available (no conflicts with 30-min buffer)
+        """
+        agent_id = slot['agent_id']
+        slot_start = datetime.fromisoformat(slot['datetime'])
+        slot_end = datetime.fromisoformat(slot['end_datetime'])
+        
+        # Add 30-minute buffer before and after
+        buffer_start = slot_start - timedelta(minutes=30)
+        buffer_end = slot_end + timedelta(minutes=30)
+        
+        # Check appointment conflicts with buffer
+        for appointment in all_appointments:
+            if appointment['agent_id'] == agent_id:
+                appt_time = appointment['appointment_time']
+                # Assume appointments are 60 minutes (no end time in DB)
+                appt_end = appt_time + timedelta(minutes=60)
+                
+                # Check if appointment overlaps with buffer zone
+                if self.times_overlap(buffer_start, buffer_end, appt_time, appt_end):
+                    return False
+        
+        # Check calendar event conflicts (direct overlap, no buffer)
+        for event in all_calendar_events:
+            if event['agent_id'] == agent_id:
+                event_start = event['start_time']
+                event_end = event['end_time']
+                
+                # Check if slot overlaps with calendar event
+                if self.times_overlap(slot_start, slot_end, event_start, event_end):
+                    return False
+        
+        return True
+    
+    def times_overlap(self, start1, end1, start2, end2):
+        """
+        Check if two time ranges overlap
+        """
+        return start1 < end2 and start2 < end1
+    
+    def get_monday_of_week(self, date):
+        """
+        Get the Monday of the week for a given date
+        """
+        days_since_monday = date.weekday()
+        monday = date - timedelta(days=days_since_monday)
+        return monday
