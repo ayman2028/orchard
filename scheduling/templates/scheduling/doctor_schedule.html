@@ -284,7 +284,8 @@
     {% endfor %}
     
     <div style="text-align: center; margin-top: 40px; color: #666;">
-        <p>🔗 <a href="/api/available-timeslots/?start_date={{ start_date|date:"Y-m-d" }}&end_date={{ end_date|date:"Y-m-d" }}" style="color: #3498db;">View JSON API Response</a></p>
+        <p>� <strong>This UI calls the REST API internally</strong> to ensure data consistency</p>
+        <p>🔗 <a href="{{ api_url }}" style="color: #3498db;">View Raw JSON API Response</a></p>
         <p>Built with Django • Agent Scheduling System</p>
     </div>
 </body>

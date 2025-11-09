@@ -8,9 +8,10 @@ from .models import Agent, AgentSettings, Appointment, CalendarEvent
 def doctor_schedule_view(request):
     """
     Web interface to display all doctors and their available times
+    Uses the API endpoint internally to ensure consistency
     """
-    # Get all active agents
-    agents = Agent.objects.filter(active=True)
+    from django.test import RequestFactory
+    import json
     
     # Get date range (default to next 7 days)
     today = datetime.now().date()
@@ -30,11 +31,64 @@ def doctor_schedule_view(request):
         except ValueError:
             pass
     
-    # Get available timeslots for all agents
+    # Call our own API to get available timeslots
+    factory = RequestFactory()
+    api_request = factory.get('/api/available-timeslots/', {
+        'start_date': start_date.strftime('%Y-%m-%d'),
+        'end_date': end_date.strftime('%Y-%m-%d')
+    })
+    
+    # Get API response
+    api_view = AvailableTimeslotsAPIView()
+    api_response = api_view.get(api_request)
+    
+    if api_response.status_code != 200:
+        # Fallback if API fails
+        context = {
+            'doctor_schedules': [],
+            'start_date': start_date,
+            'end_date': end_date,
+            'error': 'Unable to load schedule data'
+        }
+        return render(request, 'scheduling/doctor_schedule.html', context)
+    
+    api_data = api_response.data
+    available_slots = api_data.get('available_timeslots', [])
+    
+    # Organize data by doctor for display
+    doctors_data = {}
+    
+    # Group slots by agent
+    for slot in available_slots:
+        agent_id = slot['agent_id']
+        if agent_id not in doctors_data:
+            doctors_data[agent_id] = {
+                'agent': {
+                    'id': agent_id,
+                    'full_name': slot['agent_name'],
+                    'email': slot['agent_email']
+                },
+                'slots_by_date': {}
+            }
+        
+        slot_date = slot['date']
+        if slot_date not in doctors_data[agent_id]['slots_by_date']:
+            doctors_data[agent_id]['slots_by_date'][slot_date] = []
+        
+        doctors_data[agent_id]['slots_by_date'][slot_date].append({
+            'time': slot['time'],
+            'datetime': datetime.fromisoformat(slot['datetime']),
+            'available': True  # All API slots are available
+        })
+    
+    # Get all active agents (including those with no available slots)
+    all_agents = Agent.objects.filter(active=True)
+    
+    # Build final schedule structure
     doctor_schedules = []
     
-    for agent in agents:
-        # Get agent settings
+    for agent in all_agents:
+        # Get agent settings for display
         try:
             agent_settings = AgentSettings.objects.get(agent_id=agent.id)
             daily_limit = agent_settings.daily_caps
@@ -43,41 +97,39 @@ def doctor_schedule_view(request):
             daily_limit = 1
             weekly_limit = 3
         
-        # Generate available slots for this agent
-        agent_slots = []
+        # Build schedule for this agent
+        agent_schedule = []
         current_date = start_date
         
         while current_date <= end_date:
-            # Generate daily time slots (9 AM to 5 PM, 60-minute appointments)
-            daily_slots = []
+            date_str = current_date.strftime('%Y-%m-%d')
             
-            for hour in range(9, 17):  # 9 AM to 4 PM (last slot ends at 5 PM)
+            # Get slots for this date from API data
+            if (agent.id in doctors_data and 
+                date_str in doctors_data[agent.id]['slots_by_date']):
+                daily_slots = doctors_data[agent.id]['slots_by_date'][date_str]
+            else:
+                # No available slots for this date
+                daily_slots = []
+            
+            # Add all time slots (available and unavailable) for display
+            all_time_slots = []
+            for hour in range(9, 17):  # 9 AM to 4 PM
+                time_str = f"{hour:02d}:00"
                 slot_datetime = datetime.combine(current_date, time(hour, 0))
                 
-                # Check for conflicts with existing appointments
-                conflicting_appointments = Appointment.objects.filter(
-                    agent_id=agent.id,
-                    appointment_time__date=current_date,
-                    status__in=['scheduled', 'confirmed']
-                ).count()
+                # Check if this time slot is available from API
+                is_available = any(slot['time'] == time_str for slot in daily_slots)
                 
-                # Check daily capacity
-                if conflicting_appointments < daily_limit:
-                    daily_slots.append({
-                        'time': f"{hour:02d}:00",
-                        'datetime': slot_datetime,
-                        'available': True
-                    })
-                else:
-                    daily_slots.append({
-                        'time': f"{hour:02d}:00",
-                        'datetime': slot_datetime,
-                        'available': False
-                    })
+                all_time_slots.append({
+                    'time': time_str,
+                    'datetime': slot_datetime,
+                    'available': is_available
+                })
             
-            agent_slots.append({
+            agent_schedule.append({
                 'date': current_date,
-                'slots': daily_slots
+                'slots': all_time_slots
             })
             
             current_date += timedelta(days=1)
@@ -86,14 +138,15 @@ def doctor_schedule_view(request):
             'agent': agent,
             'daily_limit': daily_limit,
             'weekly_limit': weekly_limit,
-            'schedule': agent_slots
+            'schedule': agent_schedule
         })
     
     context = {
         'doctor_schedules': doctor_schedules,
         'start_date': start_date,
         'end_date': end_date,
-        'date_range': [start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)]
+        'date_range': [start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)],
+        'api_url': f"/api/available-timeslots/?start_date={start_date}&end_date={end_date}"
     }
     
     return render(request, 'scheduling/doctor_schedule.html', context)
