@@ -1,74 +1,8 @@
 
 Used Python Django as frame work, asked AI to create the first app called scheduling. 
 
-## Web Pages/Endpoints Layout for Agent Scheduling API
+Used AI to create a quick program to help me vizualize the schema of the database and see all relations.
 
-### API Endpoints (Primary - Required for Assignment)
+On excalidraw I went and designed a diagram for how this would work with a high level design.
 
-1. **GET /api/available-timeslots/**
-   - Main endpoint for the assignment
-   - Query parameters: ?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD
-   - Returns: JSON list of available appointment timeslots
-   - Example: /api/available-timeslots/?start_date=2023-06-15&end_date=2023-06-28
-
-### Optional Development/Debug Endpoints
-
-2. **GET /api/agents/**
-   - List all agents with their details
-   - Shows agent IDs, names, daily/weekly caps
-   - Useful for development and testing
-
-3. **GET /api/appointments/**
-   - List existing appointments
-   - Shows scheduled appointments and blocked times
-   - Useful for understanding current bookings
-
-4. **GET /api/agents/{id}/schedule/**
-   - Get specific agent's schedule
-   - Shows appointments and availability for one agent
-   - Useful for debugging scheduling logic
-
-### Admin/Management Pages (Django Built-in)
-
-5. **GET /admin/**
-   - Django admin interface
-   - View and manage database records
-   - Useful for inspecting the SQLite data
-
-### Development Pages (Optional)
-
-6. **GET /** (Root/Home)
-   - Simple landing page explaining the API
-   - Link to API documentation
-   - Basic project information
-
-7. **GET /api/docs/** (If using DRF browsable API)
-   - Django REST Framework's browsable API
-   - Interactive API documentation
-   - Test endpoints directly in browser
-
-### Health/Status Endpoints
-
-8. **GET /health/**
-   - Simple health check endpoint
-   - Returns API status and database connectivity
-   - Useful for deployment verification
-
-## URL Structure Layout
-
-```
-scheduler_api/
-├── urls.py (main project URLs)
-└── scheduling/
-    ├── urls.py (app-specific URLs)
-    ├── views.py (endpoint logic)
-    └── serializers.py (JSON formatting)
-```
-
-## Primary Focus for Assignment
-
-The main requirement is just **one endpoint**: `/api/available-timeslots/`
-- This is the core deliverable
-- Everything else is supporting infrastructure
-- Focus 80% of effort here for the 3-hour timeline
-
+Better understood the assignment and realized I just have to set up a single endpoint. 
