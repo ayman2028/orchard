@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Doctor Schedule - Available Appointments</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f7fa;
+            color: #333;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            margin: 0 0 10px 0;
+            font-size: 2.5em;
+        }
+        
+        .header p {
+            margin: 0;
+            opacity: 0.9;
+        }
+        
+        .date-range {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+            color: #666;
+        }
+        
+        .doctor-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e1e8ed;
+        }
+        
+        .doctor-info {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f3f6;
+        }
+        
+        .doctor-avatar {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.2em;
+            margin-right: 20px;
+        }
+        
+        .doctor-details h3 {
+            margin: 0 0 5px 0;
+            font-size: 1.4em;
+            color: #2c3e50;
+        }
+        
+        .doctor-details p {
+            margin: 0;
+            color: #7f8c8d;
+            font-size: 0.95em;
+        }
+        
+        .capacity-info {
+            margin-left: auto;
+            text-align: right;
+            font-size: 0.9em;
+            color: #666;
+        }
+        
+        .schedule-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .day-column {
+            background: #fafbfc;
+            border-radius: 10px;
+            padding: 15px;
+            border: 1px solid #e1e8ed;
+        }
+        
+        .day-header {
+            text-align: center;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #ecf0f1;
+        }
+        
+        .time-slot {
+            padding: 8px 12px;
+            margin: 5px 0;
+            border-radius: 6px;
+            text-align: center;
+            font-size: 0.9em;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+        
+        .time-slot.available {
+            background: #d5f4e6;
+            color: #27ae60;
+            border: 1px solid #27ae60;
+            cursor: pointer;
+        }
+        
+        .time-slot.available:hover {
+            background: #27ae60;
+            color: white;
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(39, 174, 96, 0.3);
+        }
+        
+        .time-slot.unavailable {
+            background: #fadbd8;
+            color: #e74c3c;
+            border: 1px solid #e74c3c;
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin: 30px 0;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .stat-item {
+            text-align: center;
+        }
+        
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #3498db;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin: 20px 0;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+        }
+        
+        .legend-color.available {
+            background: #d5f4e6;
+            border: 1px solid #27ae60;
+        }
+        
+        .legend-color.unavailable {
+            background: #fadbd8;
+            border: 1px solid #e74c3c;
+        }
+        
+        @media (max-width: 768px) {
+            .schedule-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats {
+                flex-direction: column;
+                gap: 20px;
+            }
+            
+            .legend {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏥 Doctor Schedule Dashboard</h1>
+        <p>Available Appointment Times</p>
+    </div>
+    
+    <div class="date-range">
+        📅 Showing schedule from <strong>{{ start_date|date:"M j, Y" }}</strong> to <strong>{{ end_date|date:"M j, Y" }}</strong>
+    </div>
+    
+    {% comment %} Calculate total stats {% endcomment %}
+    {% comment %} 
+    This would be better calculated in the view, but doing simple calculations here for demo
+    {% endcomment %}
+    
+    <div class="legend">
+        <div class="legend-item">
+            <div class="legend-color available"></div>
+            <span>Available</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color unavailable"></div>
+            <span>Unavailable / Booked</span>
+        </div>
+    </div>
+    
+    {% for doctor_schedule in doctor_schedules %}
+    <div class="doctor-card">
+        <div class="doctor-info">
+            <div class="doctor-avatar">
+                {{ doctor_schedule.agent.full_name|first|upper }}
+            </div>
+            <div class="doctor-details">
+                <h3>{{ doctor_schedule.agent.full_name }}</h3>
+                <p>📧 {{ doctor_schedule.agent.email }}</p>
+            </div>
+            <div class="capacity-info">
+                <div><strong>Daily Limit:</strong> {{ doctor_schedule.daily_limit }} appointments</div>
+                <div><strong>Weekly Limit:</strong> {{ doctor_schedule.weekly_limit }} appointments</div>
+            </div>
+        </div>
+        
+        <div class="schedule-grid">
+            {% for day in doctor_schedule.schedule %}
+            <div class="day-column">
+                <div class="day-header">
+                    {{ day.date|date:"D" }}<br>
+                    {{ day.date|date:"M j" }}
+                </div>
+                
+                {% for slot in day.slots %}
+                    <div class="time-slot {% if slot.available %}available{% else %}unavailable{% endif %}">
+                        {{ slot.time }}
+                    </div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% empty %}
+    <div class="doctor-card">
+        <p style="text-align: center; color: #666; font-size: 1.2em;">
+            😔 No active doctors found. Please check your database configuration.
+        </p>
+    </div>
+    {% endfor %}
+    
+    <div style="text-align: center; margin-top: 40px; color: #666;">
+        <p>🔗 <a href="/api/available-timeslots/?start_date={{ start_date|date:"Y-m-d" }}&end_date={{ end_date|date:"Y-m-d" }}" style="color: #3498db;">View JSON API Response</a></p>
+        <p>Built with Django • Agent Scheduling System</p>
+    </div>
+</body>
+</html>

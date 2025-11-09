@@ -5,6 +5,99 @@ from rest_framework import status
 from datetime import datetime, timedelta, time
 from .models import Agent, AgentSettings, Appointment, CalendarEvent
 
+def doctor_schedule_view(request):
+    """
+    Web interface to display all doctors and their available times
+    """
+    # Get all active agents
+    agents = Agent.objects.filter(active=True)
+    
+    # Get date range (default to next 7 days)
+    today = datetime.now().date()
+    start_date = today
+    end_date = today + timedelta(days=7)
+    
+    # Allow date range override from query params
+    if request.GET.get('start_date'):
+        try:
+            start_date = datetime.strptime(request.GET.get('start_date'), '%Y-%m-%d').date()
+        except ValueError:
+            pass
+    
+    if request.GET.get('end_date'):
+        try:
+            end_date = datetime.strptime(request.GET.get('end_date'), '%Y-%m-%d').date()
+        except ValueError:
+            pass
+    
+    # Get available timeslots for all agents
+    doctor_schedules = []
+    
+    for agent in agents:
+        # Get agent settings
+        try:
+            agent_settings = AgentSettings.objects.get(agent_id=agent.id)
+            daily_limit = agent_settings.daily_caps
+            weekly_limit = agent_settings.weekly_caps
+        except AgentSettings.DoesNotExist:
+            daily_limit = 1
+            weekly_limit = 3
+        
+        # Generate available slots for this agent
+        agent_slots = []
+        current_date = start_date
+        
+        while current_date <= end_date:
+            # Generate daily time slots (9 AM to 5 PM, 60-minute appointments)
+            daily_slots = []
+            
+            for hour in range(9, 17):  # 9 AM to 4 PM (last slot ends at 5 PM)
+                slot_datetime = datetime.combine(current_date, time(hour, 0))
+                
+                # Check for conflicts with existing appointments
+                conflicting_appointments = Appointment.objects.filter(
+                    agent_id=agent.id,
+                    appointment_time__date=current_date,
+                    status__in=['scheduled', 'confirmed']
+                ).count()
+                
+                # Check daily capacity
+                if conflicting_appointments < daily_limit:
+                    daily_slots.append({
+                        'time': f"{hour:02d}:00",
+                        'datetime': slot_datetime,
+                        'available': True
+                    })
+                else:
+                    daily_slots.append({
+                        'time': f"{hour:02d}:00",
+                        'datetime': slot_datetime,
+                        'available': False
+                    })
+            
+            agent_slots.append({
+                'date': current_date,
+                'slots': daily_slots
+            })
+            
+            current_date += timedelta(days=1)
+        
+        doctor_schedules.append({
+            'agent': agent,
+            'daily_limit': daily_limit,
+            'weekly_limit': weekly_limit,
+            'schedule': agent_slots
+        })
+    
+    context = {
+        'doctor_schedules': doctor_schedules,
+        'start_date': start_date,
+        'end_date': end_date,
+        'date_range': [start_date + timedelta(days=i) for i in range((end_date - start_date).days + 1)]
+    }
+    
+    return render(request, 'scheduling/doctor_schedule.html', context)
+
 class AvailableTimeslotsAPIView(APIView):
     """
     API endpoint to get available appointment timeslots

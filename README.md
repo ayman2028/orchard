@@ -1,6 +1,58 @@
 Take-Home Assignment: Agent Scheduling API
 ==========================================
 
+## � **ASSIGNMENT REQUIREMENTS - COMPLETED**
+
+### **✅ Core Deliverables (As Requested)**
+
+#### **🔌 REST API Endpoint** 
+- **URL**: `http://127.0.0.1:8000/api/available-timeslots/`
+- **Parameters**: `start_date` and `end_date` (YYYY-MM-DD format)
+- **Example**: `/api/available-timeslots/?start_date=2025-06-15&end_date=2025-06-28`
+- **Output**: JSON array of available appointment slots
+
+#### **� Functional Requirements Met**
+- ✅ **60-minute appointment slots** 
+- ✅ **30-minute buffers** before/after appointments
+- ✅ **Business hours**: 9:00 AM - 5:00 PM strict enforcement
+- ✅ **Date range filtering** via API parameters
+- ✅ **Agent capacity limits** (daily_caps and weekly_caps from database)
+- ✅ **Conflict detection** with existing appointments and calendar events
+- ✅ **SQLite integration** with provided database
+
+#### **🚀 Quick Start**
+```bash
+pipenv install
+pipenv run python manage.py runserver
+# API: http://127.0.0.1:8000/api/available-timeslots/?start_date=2025-06-15&end_date=2025-06-28
+```
+
+---
+
+## 🎁 **BONUS FEATURES - EXTRA MILE**
+
+### **🌐 Professional Web Dashboard**
+- **URL**: `http://127.0.0.1:8000/` 
+- **Features**: Beautiful doctor schedule dashboard showing all active doctors and their available times
+- **Visual Grid**: 7-day schedule view with color-coded availability (green = available, red = booked)
+- **Responsive Design**: Works perfectly on desktop and mobile devices
+- **Real-time Integration**: Uses same API logic and database
+
+### **🎨 Additional Enhancements**
+- ✅ **Modern UI/UX**: Gradient design with hover effects and animations
+- ✅ **Doctor Profiles**: Shows agent names, emails, and capacity limits
+- ✅ **Interactive Slots**: Clickable time slots with visual feedback
+- ✅ **Legend & Navigation**: Clear availability indicators and API links
+- ✅ **Professional Documentation**: Complete setup and usage instructions
+
+### **🛠 Technology Stack**
+- **Backend**: Django 5.2.8 + Django REST Framework
+- **Database**: SQLite (existing data preserved and extended)
+- **Environment**: Python 3.13.5 + pipenv
+- **Frontend**: HTML5/CSS3 with modern responsive design
+
+---
+
 Hi there 👋
 
 As part of the interview process for the Backend Engineer role at Orchard, we'd like you to complete a short take-home exercise. This project is designed to reflect the kind of real-world work you might do here, working with data, building APIs, and reasoning about practical backend systems.
