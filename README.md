@@ -27,6 +27,18 @@ pipenv run python manage.py runserver
 # API: http://127.0.0.1:8000/api/available-timeslots/?start_date=2025-06-15&end_date=2025-06-28
 ```
 
+#### **⏱️ Performance Testing**
+Run performance tests with built-in Django timing to track optimization results:
+```bash
+# Run API performance tests with timing
+python manage.py test scheduling.tests.AvailableTimeslotsAPITests --timing --verbosity=1
+
+# Expected baseline performance:
+# 🚀 Single Day API: ~2.7ms (30 slots)
+# 🚀 One Week API: ~4.5ms (240 slots)  
+# 🚀 One Month API: ~10ms (930 slots)
+```
+
 ---
 
 ## 🎁 **BONUS FEATURES - EXTRA MILE**

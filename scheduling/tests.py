@@ -62,15 +62,21 @@ class AvailableTimeslotsAPITests(APITestCase):
     
     def setUp(self):
         """Set up test data before each test"""
-        # Create test agents
+        import time
+        self.start_time = time.time()
+        
+        # Create test agents (using correct field names)
         self.agent1 = Agent.objects.create(
-            id=1, full_name="Dr. Alice Smith", email="alice@example.com", active=True
+            id=1, first_name="Dr. Alice", last_name="Smith", 
+            email="alice@example.com", phone="123-456-7890", active=True
         )
         self.agent2 = Agent.objects.create(
-            id=2, full_name="Dr. Bob Jones", email="bob@example.com", active=True
+            id=2, first_name="Dr. Bob", last_name="Jones", 
+            email="bob@example.com", phone="123-456-7891", active=True
         )
         self.inactive_agent = Agent.objects.create(
-            id=3, full_name="Dr. Inactive", email="inactive@example.com", active=False
+            id=3, first_name="Dr. Inactive", last_name="Doctor", 
+            email="inactive@example.com", phone="123-456-7892", active=False
         )
         
         # Create agent settings with different capacities
@@ -79,6 +85,68 @@ class AvailableTimeslotsAPITests(APITestCase):
         # No settings for inactive_agent (tests fallback)
         
         self.url = '/api/available-timeslots/'
+    
+    def tearDown(self):
+        """Print timing info after each test"""
+        import time
+        duration = time.time() - self.start_time
+        test_name = self._testMethodName
+        print(f"\n⏱️  {test_name}: {duration*1000:.2f}ms")
+    
+    # ========================================================================
+    # PERFORMANCE TESTS - Easy timing tracking
+    # ========================================================================
+    
+    def test_performance_single_day(self):
+        """Performance test: Single day load"""
+        import time
+        
+        start = time.time()
+        response = self.client.get(self.url, {
+            'start_date': '2025-11-10', 
+            'end_date': '2025-11-10'
+        })
+        duration = time.time() - start
+        
+        self.assertEqual(response.status_code, 200)
+        print(f"\n🚀 Single Day API: {duration*1000:.2f}ms")
+        if response.status_code == 200:
+            slots = response.json().get('total_slots', 0)
+            print(f"   Generated {slots} slots")
+    
+    def test_performance_one_week(self):
+        """Performance test: One week load"""
+        import time
+        
+        start = time.time()
+        response = self.client.get(self.url, {
+            'start_date': '2025-11-10', 
+            'end_date': '2025-11-17'
+        })
+        duration = time.time() - start
+        
+        self.assertEqual(response.status_code, 200)
+        print(f"\n🚀 One Week API: {duration*1000:.2f}ms")
+        if response.status_code == 200:
+            slots = response.json().get('total_slots', 0)
+            print(f"   Generated {slots} slots")
+    
+    def test_performance_one_month(self):
+        """Performance test: One month load"""
+        import time
+        
+        start = time.time()
+        response = self.client.get(self.url, {
+            'start_date': '2025-11-10', 
+            'end_date': '2025-12-10'
+        })
+        duration = time.time() - start
+        
+        self.assertEqual(response.status_code, 200)
+        print(f"\n🚀 One Month API: {duration*1000:.2f}ms")
+        if response.status_code == 200:
+            slots = response.json().get('total_slots', 0)
+            print(f"   Generated {slots} slots")
     
     # ========================================================================
     # PARAMETER VALIDATION TESTS

@@ -159,9 +159,15 @@ class AvailableTimeslotsAPIView(APIView):
     def get(self, request):
         """Handle GET requests for available timeslots"""
         
-        # Get query parameters
-        start_date_str = request.query_params.get('start_date')
-        end_date_str = request.query_params.get('end_date')
+        # Get query parameters (handle both DRF Request and Django WSGIRequest)
+        if hasattr(request, 'query_params'):
+            start_date_str = request.query_params.get('start_date')
+            end_date_str = request.query_params.get('end_date')
+            agent_id = request.query_params.get('agent_id')
+        else:
+            start_date_str = request.GET.get('start_date')
+            end_date_str = request.GET.get('end_date')
+            agent_id = request.GET.get('agent_id')
         
         # Basic validation
         if not start_date_str or not end_date_str:
@@ -185,8 +191,7 @@ class AvailableTimeslotsAPIView(APIView):
                 'error': 'start_date must be before or equal to end_date'
             }, status=status.HTTP_400_BAD_REQUEST)
         
-        # Get optional agent_id parameter
-        agent_id = request.query_params.get('agent_id')
+
         
         # Generate available timeslots
         try:
