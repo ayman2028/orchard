@@ -72,3 +72,37 @@ class CalendarEvent(models.Model):
     
     def __str__(self):
         return f"{self.event_name} for Agent {self.agent_id}: {self.start_time} - {self.end_time}"
+
+
+class AvailableTimeslot(models.Model):
+    """
+    Pre-computed available timeslots for faster API responses
+    
+    This table is populated by a management command and queried by the API
+    for high-performance timeslot retrieval (vs computing on every request).
+    """
+    agent_id = models.IntegerField(db_index=True)
+    agent_name = models.CharField(max_length=200)
+    agent_email = models.EmailField()
+    
+    # Date and time fields for efficient querying
+    date = models.DateField(db_index=True)  # For date range filtering
+    time = models.TimeField()  # Time portion (e.g., 14:30)
+    datetime = models.DateTimeField(db_index=True)  # Full datetime
+    end_datetime = models.DateTimeField()
+    duration_minutes = models.IntegerField(default=60)
+    
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'available_timeslots'
+        indexes = [
+            models.Index(fields=['agent_id', 'date']),
+            models.Index(fields=['datetime']),
+        ]
+        # Ensure no duplicate slots
+        unique_together = ['agent_id', 'datetime']
+    
+    def __str__(self):
+        return f"Agent {self.agent_id} - {self.datetime.strftime('%Y-%m-%d %H:%M')}"

@@ -91,7 +91,7 @@ class AvailableTimeslotsAPITests(APITestCase):
         import time
         duration = time.time() - self.start_time
         test_name = self._testMethodName
-        print(f"\n⏱️  {test_name}: {duration*1000:.2f}ms")
+        print(f"\n[TIMING] {test_name}: {duration*1000:.2f}ms")
     
     # ========================================================================
     # PERFORMANCE TESTS - Easy timing tracking
@@ -109,7 +109,7 @@ class AvailableTimeslotsAPITests(APITestCase):
         duration = time.time() - start
         
         self.assertEqual(response.status_code, 200)
-        print(f"\n🚀 Single Day API: {duration*1000:.2f}ms")
+        print(f"\n[PERF] Single Day API: {duration*1000:.2f}ms")
         if response.status_code == 200:
             slots = response.json().get('total_slots', 0)
             print(f"   Generated {slots} slots")
@@ -126,7 +126,7 @@ class AvailableTimeslotsAPITests(APITestCase):
         duration = time.time() - start
         
         self.assertEqual(response.status_code, 200)
-        print(f"\n🚀 One Week API: {duration*1000:.2f}ms")
+        print(f"\n[PERF] One Week API: {duration*1000:.2f}ms")
         if response.status_code == 200:
             slots = response.json().get('total_slots', 0)
             print(f"   Generated {slots} slots")
@@ -143,7 +143,7 @@ class AvailableTimeslotsAPITests(APITestCase):
         duration = time.time() - start
         
         self.assertEqual(response.status_code, 200)
-        print(f"\n🚀 One Month API: {duration*1000:.2f}ms")
+        print(f"\n[PERF] One Month API: {duration*1000:.2f}ms")
         if response.status_code == 200:
             slots = response.json().get('total_slots', 0)
             print(f"   Generated {slots} slots")
