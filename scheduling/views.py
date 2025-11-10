@@ -38,8 +38,8 @@ def doctor_schedule_view(request):
         'end_date': end_date.strftime('%Y-%m-%d')
     })
     
-    # Get API response
-    api_view = AvailableTimeslotsAPIView()
+    # Get API response - use the new fast API
+    api_view = FastAvailableTimeslotsAPIView()
     api_response = api_view.get(api_request)
     
     if api_response.status_code != 200:
