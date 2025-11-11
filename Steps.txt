@@ -1,8 +1,0 @@
-
-Used Python Django as frame work, asked AI to create the first app called scheduling. 
-
-Used AI to create a quick program to help me vizualize the schema of the database and see all relations.
-
-On excalidraw I went and designed a diagram for how this would work with a high level design.
-
-Better understood the assignment and realized I just have to set up a single endpoint. 
