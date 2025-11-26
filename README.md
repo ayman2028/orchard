@@ -339,3 +339,92 @@ If anything is unclear or you hit a blocker setting up the environment, don't he
 Good luck, we're excited to see your approach!
 
 - The Orchard Engineering Team
+
+# ------------------------------------------------------------
+# Agent & Client Signup APIs and HTML Forms (ADDED)
+# ------------------------------------------------------------
+
+## 🆕 Agent & Client Signup: API + HTML Forms
+
+### Overview
+The system now supports two user types: **Agents** and **Clients**. You can sign up new users via:
+- **REST API endpoints** (for programmatic access)
+- **HTML forms** (for user-friendly web signup)
+
+### Models Added
+- `UserProfile`: Extends Django User with `user_type` (agent/client)
+- `Agent`: Linked to User, stores agent-specific info
+- `Client`: Linked to User, stores client-specific info
+
+### API Endpoints
+- **Agent Signup:** `POST /api/signup/agent/`
+- **Client Signup:** `POST /api/signup/client/`
+
+#### Example API Call (Agent Signup)
+```bash
+curl -X POST http://127.0.0.1:8000/api/signup/agent/ \
+  -H "Content-Type: application/json" \
+  -d '{"username": "agent1", "password": "pass123", "email": "agent1@example.com", "full_name": "Agent One"}'
+```
+
+#### Example API Call (Client Signup)
+```bash
+curl -X POST http://127.0.0.1:8000/api/signup/client/ \
+  -H "Content-Type: application/json" \
+  -d '{"username": "client1", "password": "pass123", "email": "client1@example.com", "full_name": "Client One"}'
+```
+
+### HTML Signup Forms
+- **Agent Form:** [http://127.0.0.1:8000/api/signup/agent/form/](http://127.0.0.1:8000/api/signup/agent/form/)
+- **Client Form:** [http://127.0.0.1:8000/api/signup/client/form/](http://127.0.0.1:8000/api/signup/client/form/)
+
+#### How the HTML Forms Work
+1. User visits the form URL in browser.
+2. Fills out the signup form (username, password, email, full name).
+3. Form uses JavaScript `fetch` to POST data to the API endpoint.
+4. On success, user sees confirmation message.
+
+### Step-by-Step: Using the Signup APIs
+1. **Start the server:**
+   ```bash
+   pipenv run python manage.py runserver
+   ```
+2. **Sign up via API:**
+   - Use `curl` or Postman to POST to `/api/signup/agent/` or `/api/signup/client/` with required fields.
+3. **Sign up via HTML form:**
+   - Open `/api/signup/agent/form/` or `/api/signup/client/form/` in browser.
+   - Fill out and submit the form.
+4. **Verify in Database:**
+   - Use Django admin or SQLite CLI to check `auth_user`, `userprofile`, `agent`, and `client` tables for new entries.
+   - Example:
+     ```bash
+     sqlite3 scheduling.db "SELECT * FROM agent;"
+     sqlite3 scheduling.db "SELECT * FROM client;"
+     ```
+5. **Run tests:**
+   - Execute:
+     ```bash
+     pipenv run python manage.py test scheduling.tests_signup --verbosity=2
+     ```
+   - All signup API tests should pass.
+
+### Database Management
+- **Migrations:**
+  - All new models and fields are managed via Django migrations.
+  - To apply migrations:
+    ```bash
+    pipenv run python manage.py migrate
+    ```
+- **Manual Verification:**
+  - Use SQLite CLI or Django admin to inspect tables and confirm new users.
+
+### Files Added/Modified
+- `scheduling/models.py`: UserProfile, Agent, Client models
+- `scheduling/views.py`: AgentSignupAPIView, ClientSignupAPIView, agent_signup_page, client_signup_page
+- `scheduling/urls.py`: API and HTML form routes
+- `scheduling/templates/scheduling/agent_signup.html`, `client_signup.html`: Signup forms
+- `scheduling/tests_signup.py`: Automated tests for signup APIs
+- Migrations: Updated schema for agent/client tables
+
+---
+**For further details, see `ARCHITECTURE.md` and `SIGNUP_API_DOCS.md`.**

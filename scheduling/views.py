@@ -1,9 +1,12 @@
 from django.shortcuts import render
+from django.contrib.auth.models import User
+from django.contrib.auth.hashers import make_password
+from django.db import transaction
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from datetime import datetime, timedelta, time
-from .models import Agent, AgentSettings, Appointment, CalendarEvent
+from .models import Agent, AgentSettings, Appointment, CalendarEvent, UserProfile, Client
 
 def doctor_schedule_view(request):
     """
@@ -562,3 +565,201 @@ class FastAvailableTimeslotsAPIView(APIView):
             return Response({
                 'error': f'Failed to generate timeslots: {str(e)}'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class AgentSignupAPIView(APIView):
+    """
+    API endpoint for agent signup
+    POST /api/signup/agent/
+    
+    Creates:
+    1. Django User account
+    2. UserProfile (marking as agent)
+    3. Agent record with default settings
+    """
+    
+    def post(self, request):
+        try:
+            # Extract data
+            username = request.data.get('username')
+            email = request.data.get('email')
+            password = request.data.get('password')
+            first_name = request.data.get('first_name')
+            last_name = request.data.get('last_name')
+            phone = request.data.get('phone', '')
+            
+            # Validate required fields
+            if not all([username, email, password, first_name, last_name]):
+                return Response({
+                    'error': 'Missing required fields',
+                    'required': ['username', 'email', 'password', 'first_name', 'last_name']
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if username or email already exists
+            if User.objects.filter(username=username).exists():
+                return Response({
+                    'error': 'Username already exists'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if User.objects.filter(email=email).exists():
+                return Response({
+                    'error': 'Email already exists'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Create everything in a transaction
+            with transaction.atomic():
+                # Create User
+                user = User.objects.create(
+                    username=username,
+                    email=email,
+                    password=make_password(password),
+                    first_name=first_name,
+                    last_name=last_name
+                )
+                
+                # Create UserProfile
+                user_profile = UserProfile.objects.create(
+                    user=user,
+                    user_type='agent',
+                    phone=phone
+                )
+                
+                # Create Agent record
+                agent = Agent.objects.create(
+                    user=user,
+                    first_name=first_name,
+                    last_name=last_name,
+                    email=email,
+                    phone=phone,
+                    active=True
+                )
+                
+                # Create default AgentSettings
+                agent_settings = AgentSettings.objects.create(
+                    agent_id=agent.id,
+                    daily_caps=10,  # Default: 10 appointments per day
+                    weekly_caps=50  # Default: 50 appointments per week
+                )
+                
+                return Response({
+                    'message': 'Agent account created successfully',
+                    'user_id': user.id,
+                    'agent_id': agent.id,
+                    'username': username,
+                    'email': email,
+                    'full_name': f"{first_name} {last_name}"
+                }, status=status.HTTP_201_CREATED)
+                
+        except Exception as e:
+            return Response({
+                'error': f'Failed to create agent account: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ClientSignupAPIView(APIView):
+    """
+    API endpoint for client signup
+    POST /api/signup/client/
+    
+    Creates:
+    1. Django User account
+    2. UserProfile (marking as client)
+    3. Client record
+    """
+    
+    def post(self, request):
+        try:
+            # Extract data
+            username = request.data.get('username')
+            email = request.data.get('email')
+            password = request.data.get('password')
+            first_name = request.data.get('first_name')
+            last_name = request.data.get('last_name')
+            phone = request.data.get('phone', '')
+            date_of_birth = request.data.get('date_of_birth', None)
+            address = request.data.get('address', '')
+            
+            # Validate required fields
+            if not all([username, email, password, first_name, last_name]):
+                return Response({
+                    'error': 'Missing required fields',
+                    'required': ['username', 'email', 'password', 'first_name', 'last_name']
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if username or email already exists
+            if User.objects.filter(username=username).exists():
+                return Response({
+                    'error': 'Username already exists'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if User.objects.filter(email=email).exists():
+                return Response({
+                    'error': 'Email already exists'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Parse date_of_birth if provided
+            dob = None
+            if date_of_birth:
+                try:
+                    dob = datetime.strptime(date_of_birth, '%Y-%m-%d').date()
+                except ValueError:
+                    return Response({
+                        'error': 'Invalid date_of_birth format. Use YYYY-MM-DD'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Create everything in a transaction
+            with transaction.atomic():
+                # Create User
+                user = User.objects.create(
+                    username=username,
+                    email=email,
+                    password=make_password(password),
+                    first_name=first_name,
+                    last_name=last_name
+                )
+                
+                # Create UserProfile
+                user_profile = UserProfile.objects.create(
+                    user=user,
+                    user_type='client',
+                    phone=phone
+                )
+                
+                # Create Client record
+                client = Client.objects.create(
+                    user=user,
+                    date_of_birth=dob,
+                    address=address
+                )
+                
+                return Response({
+                    'message': 'Client account created successfully',
+                    'user_id': user.id,
+                    'client_id': client.id,
+                    'username': username,
+                    'email': email,
+                    'full_name': f"{first_name} {last_name}"
+                }, status=status.HTTP_201_CREATED)
+                
+        except Exception as e:
+            return Response({
+                'error': f'Failed to create client account: {str(e)}'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# HTML Form Views (render signup pages that call the APIs)
+
+def agent_signup_page(request):
+    """
+    Render the agent signup form page
+    The form uses JavaScript to call AgentSignupAPIView
+    """
+    return render(request, 'scheduling/agent_signup.html')
+
+
+def client_signup_page(request):
+    """
+    Render the client signup form page
+    The form uses JavaScript to call ClientSignupAPIView
+    """
+    return render(request, 'scheduling/client_signup.html')
